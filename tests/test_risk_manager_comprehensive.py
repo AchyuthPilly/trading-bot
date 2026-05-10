@@ -276,57 +276,9 @@ class TestCorrelationCalculation:
         assert rm.calculate_position_correlation("A", "B", [100], [100, 105]) == 1.0
 
 
-class TestPositionSizeAdjustment:
-    """Test adjust_position_size method."""
-
-    def test_normal_adjustment(self):
-        """Normal conditions should allow reasonable position."""
-        rm = RiskManager()
-
-        prices = [100 + i * 0.1 for i in range(50)]  # Low volatility
-        current_positions = {}
-
-        adjusted = rm.adjust_position_size("AAPL", 10000, prices, current_positions)
-
-        assert adjusted > 0
-        assert adjusted <= 10000
-
-    def test_high_risk_reduces_position(self):
-        """High-risk asset should have reduced position size."""
-        rm = RiskManager(max_position_risk=0.01)
-
-        # Very volatile prices
-        volatile_prices = [100, 120, 80, 130, 70, 140, 60]
-        current_positions = {}
-
-        adjusted = rm.adjust_position_size("VOLATILE", 10000, volatile_prices, current_positions)
-
-        # Should be reduced from desired 10000
-        assert adjusted < 10000
-
-    def test_high_correlation_strict_rejection(self):
-        """High correlation with strict mode should reject position."""
-        rm = RiskManager(max_correlation=0.5, strict_correlation_enforcement=True)
-
-        prices = [100 + i for i in range(50)]
-
-        # Existing position with same price pattern (high correlation)
-        current_positions = {
-            "EXISTING": {"value": 10000, "price_history": prices.copy(), "risk": 0.5}
-        }
-
-        # Same pattern = high correlation
-        adjusted = rm.adjust_position_size("NEW", 10000, prices, current_positions)
-
-        # Should be rejected (0) due to high correlation
-        assert adjusted == 0
-
-    def test_zero_desired_size_returns_zero(self):
-        """Zero or negative desired size should return 0."""
-        rm = RiskManager()
-
-        assert rm.adjust_position_size("X", 0, [100, 105], {}) == 0
-        assert rm.adjust_position_size("X", -100, [100, 105], {}) == 0
+# TestPositionSizeAdjustment removed: RiskManager.adjust_position_size was
+# deleted as part of B3. See docs/personal/RISK_MANAGER_SIZING_DESIGN.md and
+# tests/unit/test_sizing_pipeline.py for the replacement coverage.
 
 
 class TestPortfolioRisk:

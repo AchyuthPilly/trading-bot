@@ -507,26 +507,8 @@ class EnsembleStrategy(BaseStrategy):
                 price = self.current_prices[symbol]
                 position_value = buying_power * self.position_size
 
-                # Risk adjustment
-                current_positions = {}
-                for pos in positions:
-                    if pos.symbol in self.price_history:
-                        close_prices = [bar["close"] for bar in self.price_history[pos.symbol]]
-                        current_positions[pos.symbol] = {
-                            "value": float(pos.market_value),
-                            "price_history": close_prices,
-                            "risk": None,
-                        }
-
-                if len(self.price_history[symbol]) > 20:
-                    close_prices = [bar["close"] for bar in self.price_history[symbol]]
-                    adjusted_value = self.risk_manager.adjust_position_size(
-                        symbol, position_value, close_prices, current_positions
-                    )
-                    position_value = adjusted_value
-
                 if position_value <= 0:
-                    logger.info(f"Risk manager rejected {symbol}")
+                    logger.info(f"Position value is zero for {symbol}")
                     return
 
                 # Enforce position size limit

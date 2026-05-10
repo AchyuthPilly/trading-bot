@@ -819,9 +819,14 @@ class TestExecuteSignal:
         assert "AAPL" not in strategy_for_execution.highest_prices
 
     @pytest.mark.asyncio
-    async def test_execute_signal_risk_manager_rejects_position(self, strategy_for_execution):
-        """Test handling when risk manager rejects position."""
-        strategy_for_execution.risk_manager.adjust_position_size = Mock(return_value=0)
+    async def test_execute_signal_size_cap_zero_blocks_order(self, strategy_for_execution):
+        """Test handling when position-size cap collapses to zero.
+
+        Replaces the previous risk_manager.adjust_position_size rejection
+        path — that method was deleted as part of B3 (see
+        docs/personal/RISK_MANAGER_SIZING_DESIGN.md). The remaining
+        size-zero guard is enforce_position_size_limit returning (0, 0).
+        """
         strategy_for_execution.enforce_position_size_limit = AsyncMock(return_value=(0, 0))
 
         await strategy_for_execution._execute_signal("AAPL", "buy")
@@ -1289,19 +1294,10 @@ class TestRiskManagerIntegration:
 
         return strategy
 
-    @pytest.mark.asyncio
-    async def test_risk_manager_called_with_position_data(self, strategy_with_risk_manager):
-        """Test that risk manager is called with correct position data."""
-        with patch.object(
-            strategy_with_risk_manager.risk_manager, "adjust_position_size", return_value=10000
-        ) as mock_adjust:
-            await strategy_with_risk_manager._execute_signal("AAPL", "buy")
-
-            mock_adjust.assert_called_once()
-            call_args = mock_adjust.call_args
-            assert call_args[0][0] == "AAPL"  # symbol
-            assert call_args[0][1] == 10000  # position_value
-            assert isinstance(call_args[0][2], list)  # price_history
+    # test_risk_manager_called_with_position_data removed: the strategy-side
+    # adjust_position_size call was deleted as part of B3 (see
+    # docs/personal/RISK_MANAGER_SIZING_DESIGN.md). Pipeline-level coverage
+    # lives in tests/unit/test_sizing_pipeline.py.
 
 
 class TestShortSellingIntegration:
@@ -1371,11 +1367,21 @@ class TestShortSellingIntegration:
 
     @pytest.mark.asyncio
     async def test_short_uses_smaller_position_size(self, short_strategy):
-        """Test that short positions use smaller position size."""
+        """Test that short positions use the smaller short_position_size (8%).
+
+        Pre-B3 this asserted that risk_manager.adjust_position_size received
+        100000 * 0.08 as the desired_size argument. After B3 deletion
+        (docs/personal/RISK_MANAGER_SIZING_DESIGN.md), the path goes
+        directly from `buying_power * short_position_size` to
+        enforce_position_size_limit. Now assert the same intent via
+        enforce_position_size_limit's call_args.
+        """
         await short_strategy._execute_signal("AAPL", "short")
 
-        # Verify risk manager was called with short_position_size (8%)
-        short_strategy.risk_manager.adjust_position_size.assert_called_once()
-        call_args = short_strategy.risk_manager.adjust_position_size.call_args[0]
+        short_strategy.enforce_position_size_limit.assert_called_once()
+        call_args = short_strategy.enforce_position_size_limit.call_args[0]
         expected_value = 100000 * 0.08  # short_position_size = 0.08
-        assert call_args[1] == expected_value
+        assert call_args[1] == expected_value, (
+            f"Expected enforce_position_size_limit to receive position_value="
+            f"{expected_value} (buying_power × short_position_size), got {call_args[1]}"
+        )

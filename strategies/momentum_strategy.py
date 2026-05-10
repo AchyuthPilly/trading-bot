@@ -723,21 +723,6 @@ class MomentumStrategy(BaseStrategy):
         previous_close = previous_bar.get("close")
         return float(previous_close) if previous_close is not None else None
 
-    def _build_current_positions_dict(self, positions):
-        """Build a dictionary of current positions with price history for risk analysis."""
-        current_positions = {}
-        for pos in positions:
-            pos_symbol = pos.symbol
-            if pos_symbol in self.price_history:
-                price_history = self.price_history[pos_symbol]
-                close_prices = [bar["close"] for bar in price_history]
-                current_positions[pos_symbol] = {
-                    "value": abs(float(pos.market_value)),
-                    "price_history": close_prices,
-                    "risk": None,
-                }
-        return current_positions
-
     async def _calculate_position_value(self, symbol, price, buying_power, is_short=False):
         """
         Calculate position value using Kelly criterion or fixed sizing.
@@ -768,18 +753,6 @@ class MomentumStrategy(BaseStrategy):
 
         return position_value
 
-    async def _apply_risk_adjustments(self, symbol, position_value, positions):
-        """Apply risk manager adjustments to position value."""
-        current_positions = self._build_current_positions_dict(positions)
-
-        if len(self.price_history[symbol]) > 20:
-            close_prices = [bar["close"] for bar in self.price_history[symbol]]
-            position_value = self.risk_manager.adjust_position_size(
-                symbol, position_value, close_prices, current_positions
-            )
-
-        return position_value
-
     async def _execute_buy_signal(self, symbol, positions, buying_power, current_time):
         """Execute a buy signal for the given symbol."""
         if len(positions) >= self.max_positions:
@@ -788,10 +761,9 @@ class MomentumStrategy(BaseStrategy):
 
         price = self.current_prices[symbol]
         position_value = await self._calculate_position_value(symbol, price, buying_power)
-        position_value = await self._apply_risk_adjustments(symbol, position_value, positions)
 
         if position_value <= 0:
-            logger.info(f"Risk manager rejected position for {symbol}")
+            logger.info(f"Position value is zero for {symbol}")
             return
 
         # Enforce maximum position size limit
@@ -855,10 +827,9 @@ class MomentumStrategy(BaseStrategy):
         position_value = await self._calculate_position_value(
             symbol, price, buying_power, is_short=True
         )
-        position_value = await self._apply_risk_adjustments(symbol, position_value, positions)
 
         if position_value <= 0:
-            logger.info(f"Risk manager rejected SHORT position for {symbol}")
+            logger.info(f"Position value is zero for SHORT {symbol}")
             return
 
         # Enforce maximum position size limit

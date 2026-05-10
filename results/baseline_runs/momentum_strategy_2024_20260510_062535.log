@@ -1,0 +1,80 @@
+ib_insync not installed. IB broker will not function.
+2026-05-10 06:25:36,641 - __main__ - INFO - Starting backtest from 2024-01-01 to 2024-12-31
+2026-05-10 06:25:36,641 - brokers.alpaca_broker - INFO - AlpacaBroker initialized with paper=True (type: <class 'bool'>)
+2026-05-10 06:25:36,646 - utils.audit_log - INFO - Audit log chain verified successfully
+2026-05-10 06:25:36,646 - utils.audit_log - INFO - Audit log initialized: 146 entries, sequence 146, log_dir=audit_logs
+2026-05-10 06:25:36,646 - engine.strategy_manager - INFO - Loading strategies from: /Users/roys-mac/Documents/scynaero/Trading-bot/trading-bot/strategies
+2026-05-10 06:25:36,646 - engine.strategy_manager - INFO - Loaded strategy: EnhancedMomentumStrategy
+2026-05-10 06:25:36,648 - engine.strategy_manager - INFO - Loaded strategy: EnsembleVotingStrategy
+2026-05-10 06:25:36,648 - engine.strategy_manager - INFO - Loaded strategy: AdaptiveStrategy
+2026-05-10 06:25:36,648 - engine.strategy_manager - INFO - Loaded strategy: MeanReversionStrategy
+2026-05-10 06:25:36,648 - engine.strategy_manager - INFO - Loaded strategy: MomentumStrategy
+2026-05-10 06:25:36,649 - engine.strategy_manager - INFO - Loaded strategy: EnsembleStrategy
+2026-05-10 06:25:36,679 - engine.strategy_manager - INFO - Loaded strategy: ExtendedHoursStrategy
+2026-05-10 06:25:36,679 - engine.strategy_manager - INFO - Loaded strategy: SimpleMACrossover
+2026-05-10 06:25:36,681 - engine.strategy_manager - INFO - Loaded strategy: MeanReversionStrategy
+2026-05-10 06:25:36,682 - engine.strategy_manager - INFO - Loaded strategy: MomentumStrategy
+2026-05-10 06:25:36,682 - engine.strategy_manager - INFO - Loaded strategy: MomentumStrategyBacktest
+2026-05-10 06:25:36,682 - engine.strategy_manager - INFO - Loaded strategy: MomentumStrategy
+2026-05-10 06:25:36,684 - engine.strategy_manager - INFO - Loaded strategy: LSTMEnhancedStrategy
+2026-05-10 06:25:36,684 - engine.strategy_manager - INFO - Loaded strategy: MomentumStrategy
+2026-05-10 06:25:36,732 - engine.strategy_manager - INFO - Loaded strategy: PairsTradingStrategy
+2026-05-10 06:25:36,732 - engine.strategy_manager - INFO - Loaded strategy: BracketMomentumStrategy
+2026-05-10 06:25:36,733 - engine.strategy_manager - INFO - Loaded strategy: GapTradingStrategy
+2026-05-10 06:25:36,733 - engine.strategy_manager - INFO - Loaded 13 strategies
+2026-05-10 06:25:36,733 - __main__ - INFO - Available strategies: ['EnhancedMomentumStrategy', 'EnsembleVotingStrategy', 'AdaptiveStrategy', 'MeanReversionStrategy', 'MomentumStrategy', 'EnsembleStrategy', 'ExtendedHoursStrategy', 'SimpleMACrossover', 'MomentumStrategyBacktest', 'LSTMEnhancedStrategy', 'PairsTradingStrategy', 'BracketMomentumStrategy', 'GapTradingStrategy']
+2026-05-10 06:25:36,733 - __main__ - INFO - Backtesting strategy: MomentumStrategy
+2026-05-10 06:25:36,738 - utils.historical_universe - INFO - HistoricalUniverse initialized: 184 symbols tracked
+2026-05-10 06:25:36,738 - engine.backtest_engine - INFO - Survivorship bias correction enabled: 184 symbols tracked
+2026-05-10 06:25:36,738 - engine.backtest_engine - INFO - Loading historical data for 5 symbols from 2024-01-01 to 2024-12-31...
+2026-05-10 06:25:36,938 - utils.circuit_breaker - INFO - Circuit Breaker initialized: max daily loss = 3.0%, economic calendar = True
+2026-05-10 06:25:36,939 - utils.economic_calendar - INFO - EconomicEventCalendar: avoid_high=True, avoid_medium=False
+2026-05-10 06:25:36,939 - utils.circuit_breaker - INFO - Economic calendar initialized: block_high_impact=True, reduce_medium=True
+2026-05-10 06:25:36,939 - utils.circuit_breaker - INFO - Circuit Breaker armed: Starting equity: $100,000.00, Will halt if equity drops below $97,000.00
+2026-05-10 06:25:36,939 - MomentumStrategy - INFO - ✅ Circuit breaker armed: max daily loss = 3.0%
+2026-05-10 06:25:36,939 - strategies.momentum_strategy - INFO - RSI standard mode (period=14, thresholds: 30/70)
+2026-05-10 06:25:36,939 - strategies.momentum_strategy - INFO - Trailing stops enabled: 2.0% trail, activates at 2.0% profit
+2026-05-10 06:25:36,939 - strategies.momentum_strategy - INFO - Crypto long-only relaxed entry enabled: buy threshold score >= 1.00
+2026-05-10 06:25:36,940 - strategies.momentum_strategy - INFO - Crypto long-only dip-buy enabled: RSI<=35.0, MACD-hist delta>=0.020, rebound>=0.10%
+2026-05-10 06:25:36,940 - strategies.momentum_strategy - INFO - Initialized MomentumStrategy with 5 symbols
+2026-05-10 06:25:36,940 - engine.backtest_engine - INFO - Running backtest over 251 trading days...
+2026-05-10 06:25:36,940 - engine.backtest_engine - INFO -   Day 0/251: Equity = $100,000.00
+2026-05-10 06:25:37,012 - engine.backtest_engine - INFO -   Day 50/251: Equity = $100,000.00
+2026-05-10 06:25:37,014 - engine.backtest_engine - INFO -   Trade signal: MSFT - buy
+2026-05-10 06:25:37,015 - strategies.momentum_strategy - INFO - Creating bracket order for MSFT:
+2026-05-10 06:25:37,015 - strategies.momentum_strategy - INFO -   Entry: $425.22 x 0.1176 shares
+2026-05-10 06:25:37,015 - strategies.momentum_strategy - INFO -   Take-profit: $446.48 (+5.0%)
+2026-05-10 06:25:37,015 - strategies.momentum_strategy - INFO -   Stop-loss: $412.46 (-3.0%)
+2026-05-10 06:25:37,018 - utils.order_gateway - INFO - ORDER SUBMITTED: BUY 0.1175861906777668 MSFT by MomentumStrategy (ID: 1)
+2026-05-10 06:25:37,018 - MomentumStrategy - INFO - ENTRY ORDER: momentum_entry - BUY 0.1175861906777668 MSFT (Order ID: 1)
+2026-05-10 06:25:37,018 - strategies.momentum_strategy - INFO - BUY bracket order submitted for MSFT: 0.1176 shares at ~$425.22
+2026-05-10 06:25:37,020 - engine.backtest_engine - INFO -   Trade signal: MSFT - buy
+2026-05-10 06:25:37,111 - engine.backtest_engine - INFO -   Day 100/251: Equity = $100,001.62
+2026-05-10 06:25:37,146 - engine.backtest_engine - INFO -   Trade signal: AAPL - buy
+2026-05-10 06:25:37,147 - strategies.risk_manager - ERROR - Error calculating portfolio risk: unsupported operand type(s) for *: 'float' and 'NoneType'
+2026-05-10 06:25:37,147 - strategies.momentum_strategy - INFO - Creating bracket order for AAPL:
+2026-05-10 06:25:37,147 - strategies.momentum_strategy - INFO -   Entry: $207.49 x 0.2409 shares
+2026-05-10 06:25:37,147 - strategies.momentum_strategy - INFO -   Take-profit: $217.86 (+5.0%)
+2026-05-10 06:25:37,147 - strategies.momentum_strategy - INFO -   Stop-loss: $201.27 (-3.0%)
+2026-05-10 06:25:37,148 - utils.order_gateway - INFO - ORDER SUBMITTED: BUY 0.24085747413752892 AAPL by MomentumStrategy (ID: 2)
+2026-05-10 06:25:37,148 - MomentumStrategy - INFO - ENTRY ORDER: momentum_entry - BUY 0.24085747413752892 AAPL (Order ID: 2)
+2026-05-10 06:25:37,148 - strategies.momentum_strategy - INFO - BUY bracket order submitted for AAPL: 0.2409 shares at ~$207.49
+2026-05-10 06:25:37,209 - engine.backtest_engine - INFO -   Day 150/251: Equity = $99,998.29
+2026-05-10 06:25:37,307 - engine.backtest_engine - INFO -   Day 200/251: Equity = $100,005.82
+2026-05-10 06:25:37,405 - engine.backtest_engine - INFO -   Day 250/251: Equity = $100,011.60
+2026-05-10 06:25:37,405 - engine.backtest_engine - INFO - Backtest complete: Final equity = $100,011.60 (+0.01%)
+2026-05-10 06:25:37,405 - engine.backtest_engine - INFO - Total trades: 2
+2026-05-10 06:25:37,405 - engine.backtest_engine - INFO - Gap Risk Analysis: 126 gap events, 0 stops gapped through, total gap slippage: $0.00
+2026-05-10 06:25:37,405 - engine.backtest_engine - WARNING -   WARNING: Largest gap was 9.4% - consider tighter position sizing
+2026-05-10 06:25:37,407 - __main__ - INFO - Backtest completed
+
+--- MomentumStrategy Performance Summary ---
+Total Return: 0.01%
+Annualized Return: 0.01%
+Sharpe Ratio: -133.81
+Max Drawdown: 0.01%
+Win Rate: 0.00%
+Average Win: 0.00%
+Average Loss: 0.00%
+Profit Factor: 0.00
+Number of Trades: 2

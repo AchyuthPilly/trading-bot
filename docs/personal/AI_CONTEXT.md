@@ -32,8 +32,16 @@ Phase 1 status:
 - ✅ First successful backtest: `MomentumStrategyBacktest` on AAPL/MSFT/GOOGL/NVDA/META/AMZN for 2024 → +21.26% return, Sharpe 1.62, 6 trades. **Important caveat:** subsequent parity audit (see below) revealed this measures `MomentumStrategyBacktest`, which has materially different parameters and sizing logic from the live `MomentumStrategy`. The number is not predictive of live behavior.
 - ✅ Parity audit: `MomentumStrategy` vs `MomentumStrategyBacktest` — found `MomentumStrategy.execute_trade()` was a `pass`, so the live class produced zero orders when run through `BacktestEngine`. Same family of bug as PR #3, inverted direction.
 - ✅ Parity fix merged: `fix: make MomentumStrategy runnable in BacktestEngine` (PR #6). Replaces the empty `execute_trade` with dispatch to `_execute_signal` + `_check_exit_conditions`, fixes three corollary issues (async `get_positions`, simulated-time cooldown, `price_history` shape parity), adds regression + cooldown tests. 4343/4377 passing, 3 verified-pre-existing failures.
-- ✅ Bracket-qty fix merged (PR #N, closes #9): `fix: BacktestBroker preserves fractional qty`. Single-line `int(qty)` → `float(qty)` in `BacktestBroker.submit_order_advanced`. Diagnosis was corrected during Phase 1 from the original hypothesis (leg-extraction) to the actual bug (int truncation) via empirical instrumentation. Three follow-up issues filed (#X, #Y, #Z).
-- 🔜 **Phase 1 unblocked.** Re-run 2024 backtest with live `MomentumStrategy` on AAPL/MSFT/GOOGL/NVDA/META/AMZN. Compare against the +21.26% number from `MomentumStrategyBacktest`. Expect divergence; honest divergence is the goal. **This is the first faithful measurement of the live strategy.**variant. Expect divergence; honest divergence is the goal.
+- ✅ Bracket-qty fix merged (PR #14, closes #9): `fix: BacktestBroker preserves fractional qty`. Single-line `int(qty)` → `float(qty)` in `BacktestBroker.submit_order_advanced`. Diagnosis was corrected during Phase 1 from the original hypothesis (leg-extraction) to the actual bug (int truncation) via empirical instrumentation. Three follow-up issues filed (#11, #12, #13).
+- ✅ First live `MomentumStrategy` baseline run (2026-05-10): +0.01% return, 2 trades, 0.12-0.24 share positions. Diagnostic — surfaced that the sizing pipeline was broken (not the strategy). RiskManager `adjust_position_size` was shrinking every position 30-100× via a units-mismatched multiplier. Tracked as issue #11.
+- ✅ Fix A merged (PR #18): `fix: RiskManager portfolio calc tolerates None risk; neutral fallback`. Surgical correctness fix to `calculate_portfolio_risk` — None tolerance + neutral-fallback. Behavior-neutral; did not change position sizes (verified empirically in PR #18's diagnosis).
+- ✅ B3 merged (PR #19, closes #11): `fix: remove broken risk-adjustment multiplier from sizing path`. Deleted `RiskManager.adjust_position_size` and call sites in MomentumStrategy / MeanReversionStrategy / EnsembleStrategy. Sizing now flows through Kelly + `enforce_position_size_limit` + gateway gates (the principled pipeline that already worked). Two follow-up issues filed: #20 (enforce_limits cleanup), #21 (MomentumStrategyBacktest retirement evaluation). Driven by design investigation in `docs/personal/RISK_MANAGER_SIZING_DESIGN.md`.
+- ✅ Post-B3 baseline run (2026-05-10): +1.11% return, 2 trades, 11.76 / 22.92 share positions. **First interpretable live `MomentumStrategy` measurement.** Position sizes 100× and 95× larger than pre-B3 (smoking gun for the unit-mismatch hypothesis). Recorded in `BACKTEST_RESULTS.md`. Internal calibration only — 2 trades is too few for signal-quality conclusions.
+- 🔜 Run more backtest variations (different years, baskets, strategy parameters) to build a cross-regime picture of strategy behavior
+- 🔜 Run live paper trading during market hours
+- 🔜 Set up Discord/Telegram notifications
+- 🔜 Deploy to Railway for 24/7 paper trading
+- 🔜 Run for 2+ weeks before declaring Phase 1 complete
 - 🔜 Run more backtest variations (different strategies, time windows, symbols)
 - 🔜 Run live paper trading during market hours
 - 🔜 Set up Discord/Telegram notifications
@@ -41,8 +49,10 @@ Phase 1 status:
 - 🔜 Run for 2+ weeks before declaring Phase 1 complete
 
 Known issues identified during Phase 1:
-- ~~**Phase 1 blocker:** `BacktestBroker.submit_order_advanced` truncates fractional qty to int (issue #9)~~ — fixed by PR #N.
-- Open follow-ups from PR #N's Phase 1 audit: `RiskManager.adjust_position_size` produces sub-1 quantities for $100k accounts (issue #X), `_simulate_partial_fill` int truncation (#Y), `MomentumStrategyBacktest._place_backtest_order` int truncation (#Z). None are blockers — broker faithfully executes whatever the strategy submits.
+- ~~**Phase 1 blocker:** `BacktestBroker.submit_order_advanced` truncates fractional qty to int (issue #9)~~ — fixed by PR #14.
+- ~~`RiskManager.adjust_position_size` produces sub-1 quantities for $100k accounts (issue #11)~~ — fixed by PR #19 (B3 deletion).
+- Open follow-ups: `_simulate_partial_fill` int truncation (#12), `MomentumStrategyBacktest._place_backtest_order` int truncation (#13). Neither is a blocker.
+- New follow-ups from PR #19: `enforce_limits` portfolio-risk gate has the same units mismatch as the deleted multiplier (#20, fragile no-op, latent footgun); evaluate `MomentumStrategyBacktest` retirement now that the live class is runnable and sized correctly (#21).
 - BacktestEngine creates its own OrderGateway separately from StrategyManager's — should thread the same instance through (Phase 3 task)
 - ~~`BacktestBroker.get_positions()` async warning in OrderGateway logs~~ — fixed by parity PR (pulled forward from Phase 3)
 - ~~No CI smoke test for backtest order placement~~ — added by parity PR (`tests/unit/test_momentum_strategy_backtest_parity.py`)
@@ -52,6 +62,8 @@ Lessons learned (process notes):
 - Phase 1 / 2 / 3 stop points in risk-critical PR work caught real issues (Blockers A and B during Phase 1 analysis, fixture mismatch during Phase 2). The ~3-file scope-expansion threshold for "stop and check" worked.
 - `MomentumStrategyBacktest` exists primarily as a workaround for the empty `execute_trade` in the live class. Now that the parity PR has landed, evaluate deleting it or reducing it to a pure parameter override (no logic divergence). Open question for a separate `DECISIONS.md` entry.
 - Phase 1 analysis should empirically verify the bug, not just trace from the assumed root cause. The bracket-qty PR's Phase 1 found the actual bug (`int(qty)` truncation on line 763) was different from the issue's hypothesized bug (leg-structure extraction). Empirical instrumentation caught this before it shaped the wrong fix and the wrong test. The PR's branch name, title, and test naming all reflect the real bug from the start as a result.
+- Phase 1 analysis benefits from explicitly asking "will this fix actually solve the user-visible problem, or just remove a log line?" The RiskManager investigation found two bugs sharing one code path — Bug 1 (None tolerance) and Bug 2 (units mismatch in `adjust_position_size`). Fixing Bug 1 alone would have removed the log error without changing position sizes; the sub-1-share symptom would have persisted. Distinguishing "correctness" from "operational impact" early in Phase 1 prevented committing a fix that produced no measurable improvement.
+- For structural problems (not just bug fixes), separate the design investigation from the PR's Phase 1. The B3 design doc (`RISK_MANAGER_SIZING_DESIGN.md`) absorbed all the surprise-discovery work before code analysis began, which is why PR #19's Phase 1 produced no surprises — first time in the arc that happened. Pattern: when a fix is structural (delete a code layer, rewrite an abstraction), do plan-only design work first, then a normal three-phase PR. Two-step process produces cleaner work in both halves.
 
 ## Key Decisions Made
 
@@ -137,4 +149,4 @@ When something significant changes:
 3. Commit both changes together with a message like `docs: update AI context after [decision]`
 4. If using Claude.ai Project knowledge, re-upload this file to keep it synced
 
-Last updated: May 11, 2026 — bracket-qty fix merged (closes #9), Phase 1 unblocked for first faithful live-strategy backtest
+Last updated: May 10, 2026 — Phase 1 sizing operational. PRs #18 and #19 merged. First interpretable live MomentumStrategy baseline (+1.11%) recorded in BACKTEST_RESULTS.md. Issues #20 and #21 filed as follow-ups.

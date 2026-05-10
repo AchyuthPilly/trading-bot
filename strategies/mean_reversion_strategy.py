@@ -375,29 +375,8 @@ class MeanReversionStrategy(BaseStrategy):
                 price = self.current_prices[symbol]
                 position_value = buying_power * self.position_size
 
-                # Risk-adjust position size
-                current_positions = {}
-                for pos in positions:
-                    pos_symbol = pos.symbol
-                    if pos_symbol in self.price_history:
-                        price_history = self.price_history[pos_symbol]
-                        close_prices = [bar["close"] for bar in price_history]
-                        current_positions[pos_symbol] = {
-                            "value": float(pos.market_value),
-                            "price_history": close_prices,
-                            "risk": None,
-                        }
-
-                # Use risk manager to adjust position size if we have price history
-                if len(self.price_history[symbol]) > 20:
-                    close_prices = [bar["close"] for bar in self.price_history[symbol]]
-                    adjusted_value = self.risk_manager.adjust_position_size(
-                        symbol, position_value, close_prices, current_positions
-                    )
-                    position_value = adjusted_value
-
                 if position_value <= 0:
-                    logger.info(f"Risk manager rejected position for {symbol}")
+                    logger.info(f"Position value is zero for {symbol}")
                     return
 
                 # CRITICAL SAFETY: Enforce maximum position size limit (5% of portfolio)
@@ -464,29 +443,8 @@ class MeanReversionStrategy(BaseStrategy):
                 price = self.current_prices[symbol]
                 position_value = buying_power * self.short_position_size
 
-                # Risk-adjust position size
-                current_positions = {}
-                for pos in positions:
-                    pos_symbol = pos.symbol
-                    if pos_symbol in self.price_history:
-                        price_history = self.price_history[pos_symbol]
-                        close_prices = [bar["close"] for bar in price_history]
-                        current_positions[pos_symbol] = {
-                            "value": abs(float(pos.market_value)),
-                            "price_history": close_prices,
-                            "risk": None,
-                        }
-
-                # Use risk manager to adjust position size
-                if len(self.price_history[symbol]) > 20:
-                    close_prices = [bar["close"] for bar in self.price_history[symbol]]
-                    adjusted_value = self.risk_manager.adjust_position_size(
-                        symbol, position_value, close_prices, current_positions
-                    )
-                    position_value = adjusted_value
-
                 if position_value <= 0:
-                    logger.info(f"Risk manager rejected SHORT position for {symbol}")
+                    logger.info(f"Position value is zero for SHORT {symbol}")
                     return
 
                 # CRITICAL SAFETY: Enforce maximum position size limit

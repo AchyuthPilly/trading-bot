@@ -1444,22 +1444,19 @@ class TestExecuteSignal:
         trading_strategy.calculate_kelly_position_size.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_execute_signal_uses_risk_manager(self, trading_strategy):
-        """Test that execute_signal uses risk manager for position sizing."""
+    async def test_execute_signal_size_cap_zero_blocks_order(self, trading_strategy):
+        """Test that execution stops when the position-size cap collapses to zero.
+
+        Replaces the previous assert that risk_manager.adjust_position_size
+        was called — that method was deleted as part of B3 (see
+        docs/personal/RISK_MANAGER_SIZING_DESIGN.md). The remaining
+        size-zero guard is enforce_position_size_limit returning (0, 0),
+        which is what should block the order.
+        """
         for _i in range(25):
             trading_strategy.price_history["AAPL"].append({"close": 150})
 
-        await trading_strategy._execute_signal("AAPL", "buy")
-
-        trading_strategy.risk_manager.adjust_position_size.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_execute_signal_risk_manager_rejects_position(self, trading_strategy):
-        """Test that execution stops when risk manager rejects position."""
-        for _i in range(25):
-            trading_strategy.price_history["AAPL"].append({"close": 150})
-
-        trading_strategy.risk_manager.adjust_position_size = Mock(return_value=0)
+        trading_strategy.enforce_position_size_limit = AsyncMock(return_value=(0, 0))
 
         await trading_strategy._execute_signal("AAPL", "buy")
 
@@ -1863,53 +1860,10 @@ class TestEdgeCases:
         # The code checks if symbol not in self.symbols first
 
 
-class TestRiskManagerIntegration:
-    """Tests for risk manager integration."""
-
-    @pytest.mark.asyncio
-    async def test_risk_manager_called_with_position_data(self):
-        """Test risk manager receives correct position data."""
-        from strategies.momentum_strategy import MomentumStrategy
-
-        strategy = MomentumStrategy.__new__(MomentumStrategy)
-        strategy.symbols = ["AAPL"]
-        strategy.max_positions = 5
-        strategy.position_size = 0.10
-        strategy.stop_loss = 0.03
-        strategy.take_profit = 0.05
-        strategy.enable_short_selling = False
-        strategy.parameters = {"use_kelly_criterion": False}
-        strategy.current_prices = {"AAPL": 150.0}
-        strategy.last_signal_time = {"AAPL": None}
-        strategy.stop_prices = {}
-        strategy.target_prices = {}
-
-        # Add price history for risk manager
-        strategy.price_history = {
-            "AAPL": [{"close": 150.0} for _ in range(25)],
-            "MSFT": [{"close": 300.0} for _ in range(25)],
-        }
-
-        # Existing position
-        mock_position = Mock()
-        mock_position.symbol = "MSFT"
-        mock_position.market_value = "30000"
-
-        strategy.broker = Mock()
-        strategy.broker.get_positions = AsyncMock(return_value=[mock_position])
-        strategy.broker.get_account = AsyncMock(return_value=Mock(buying_power="100000"))
-        strategy.broker.submit_order_advanced = AsyncMock(return_value=Mock(id="123"))
-
-        strategy.risk_manager = Mock()
-        strategy.risk_manager.adjust_position_size = Mock(return_value=10000)
-        strategy.enforce_position_size_limit = AsyncMock(return_value=(10000, 66.67))
-
-        await strategy._execute_signal("AAPL", "buy")
-
-        # Verify risk manager was called with current positions
-        strategy.risk_manager.adjust_position_size.assert_called_once()
-        call_args = strategy.risk_manager.adjust_position_size.call_args
-        assert "AAPL" == call_args[0][0]  # symbol
+# TestRiskManagerIntegration removed: the strategy-side adjust_position_size
+# call was deleted as part of B3 (see
+# docs/personal/RISK_MANAGER_SIZING_DESIGN.md). Pipeline-level coverage
+# (Kelly + cap + gateway gates) lives in tests/unit/test_sizing_pipeline.py.
 
 
 if __name__ == "__main__":

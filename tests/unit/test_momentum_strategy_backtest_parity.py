@@ -169,6 +169,21 @@ async def test_momentum_strategy_runs_in_backtest_engine_and_places_orders(monke
         "is truncating fractional qty (see fix/backtest-broker-fractional-qty)."
     )
 
+    # B3 contract: with broken risk-multiplier removed (issue #11), a
+    # $100k account at default position_size=0.05 and price ~$100 should
+    # produce ~50 shares. Pre-B3 this was 0.5 shares because
+    # RiskManager.adjust_position_size's units-mismatched multiplier
+    # shrank by ~100×. Locking quantity >= 1 guarantees the regression
+    # is detectable: any reintroduction of a 30–100× soft shrink will
+    # collapse this to sub-1 immediately.
+    # See docs/personal/RISK_MANAGER_SIZING_DESIGN.md.
+    assert first_trade["quantity"] >= 1, (
+        f"$100k account producing sub-1 share quantity "
+        f"({first_trade['quantity']}) — sizing pipeline is shrinking "
+        "positions unexpectedly. The B3 deletion may have been reverted "
+        "or a new soft-multiplier reintroduced."
+    )
+
 
 # ---------------------------------------------------------------------------
 # Cooldown: simulated time, not wall clock, gates _execute_signal

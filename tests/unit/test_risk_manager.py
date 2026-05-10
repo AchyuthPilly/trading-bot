@@ -520,82 +520,14 @@ class TestCalculatePortfolioRisk:
 
 
 # =============================================================================
-# Position Size Adjustment Tests
+# Position Size Adjustment Tests — REMOVED.
+#
+# RiskManager.adjust_position_size was deleted as part of B3 (see
+# docs/personal/RISK_MANAGER_SIZING_DESIGN.md). Position sizing now flows
+# through the Kelly + enforce_position_size_limit + gateway-gates pipeline
+# without a strategy-side soft multiplier. Pipeline-level coverage lives in
+# tests/unit/test_sizing_pipeline.py.
 # =============================================================================
-class TestAdjustPositionSize:
-    """Tests for adjust_position_size method."""
-
-    def test_adjust_size_with_no_positions(self, risk_manager_strict, stable_prices):
-        """Test size adjustment with no existing positions."""
-        adjusted = risk_manager_strict.adjust_position_size(
-            "AAPL", DEFAULT_POSITION_VALUE, stable_prices, {}
-        )
-
-        assert (
-            0 <= adjusted <= DEFAULT_POSITION_VALUE
-        ), f"Adjusted size should be in [0, {DEFAULT_POSITION_VALUE}], got {adjusted}"
-
-    @pytest.mark.parametrize("desired_size", [-1000, 0])
-    def test_adjust_size_with_invalid_desired_size(self, risk_manager_strict, desired_size):
-        """Test size adjustment with invalid desired size returns 0."""
-        prices = [100, 101, 102]
-        adjusted = risk_manager_strict.adjust_position_size("AAPL", desired_size, prices, {})
-
-        assert adjusted == 0, f"Expected 0 for invalid desired size, got {adjusted}"
-
-    def test_adjust_size_rejects_high_correlation_strict(self, risk_manager_strict, stable_prices):
-        """Test strict mode rejects positions with high correlation."""
-        current_positions = {
-            "MSFT": {
-                "value": DEFAULT_POSITION_VALUE,
-                "price_history": stable_prices.copy(),  # Same prices = perfect correlation
-            }
-        }
-        adjusted = risk_manager_strict.adjust_position_size(
-            "AAPL", DEFAULT_POSITION_VALUE, stable_prices, current_positions
-        )
-
-        assert adjusted == 0, f"Expected 0 for high correlation in strict mode, got {adjusted}"
-
-    def test_adjust_size_reduces_high_correlation_soft(self, risk_manager_soft, stable_prices):
-        """Test soft mode reduces (not rejects) positions with high correlation."""
-        correlated_prices = generate_correlated_prices(stable_prices)
-        current_positions = {
-            "MSFT": {"value": DEFAULT_POSITION_VALUE, "price_history": correlated_prices}
-        }
-        adjusted = risk_manager_soft.adjust_position_size(
-            "AAPL", DEFAULT_POSITION_VALUE, stable_prices, current_positions
-        )
-
-        assert adjusted >= 0, f"Adjusted size should be non-negative, got {adjusted}"
-
-    def test_adjust_size_stores_risk(self, risk_manager_strict, stable_prices):
-        """Test that adjust_position_size stores risk in current_positions."""
-        current_positions = {
-            "AAPL": {"value": DEFAULT_POSITION_VALUE / 2, "price_history": stable_prices.copy()}
-        }
-        risk_manager_strict.adjust_position_size(
-            "AAPL", DEFAULT_POSITION_VALUE, stable_prices, current_positions
-        )
-
-        assert "risk" in current_positions["AAPL"], "Risk should be stored in current_positions"
-
-    def test_adjust_size_stores_correlations(self, risk_manager_soft, stable_prices):
-        """Test that adjust_position_size stores correlations."""
-        np.random.seed(RANDOM_SEED + 2)
-        other_prices = (150 + np.cumsum(np.random.randn(50) * 0.1)).tolist()
-        current_positions = {
-            "MSFT": {"value": DEFAULT_POSITION_VALUE, "price_history": other_prices}
-        }
-        risk_manager_soft.adjust_position_size(
-            "AAPL", DEFAULT_POSITION_VALUE, stable_prices, current_positions
-        )
-
-        has_correlation = ("AAPL", "MSFT") in risk_manager_soft.position_correlations or (
-            "MSFT",
-            "AAPL",
-        ) in risk_manager_soft.position_correlations
-        assert has_correlation, "Correlations should be stored"
 
 
 # =============================================================================
@@ -646,23 +578,12 @@ class TestEdgeCases:
 
         assert risk == 0.0, f"Expected 0.0 (neutral fallback) on error, got {risk}"
 
-    def test_adjust_size_with_math_error(self, risk_manager_strict):
-        """Test adjust_position_size handles math errors gracefully."""
-        prices = [float("inf")] * 3
-        adjusted = risk_manager_strict.adjust_position_size(
-            "AAPL", DEFAULT_POSITION_VALUE, prices, {}
-        )
-
-        assert adjusted >= 0, f"Adjusted size should be non-negative, got {adjusted}"
-
-    def test_adjust_size_with_missing_position_keys(self, risk_manager_strict, stable_prices):
-        """Test adjust_position_size handles missing position keys."""
-        current_positions = {"MSFT": {}}  # Missing 'value' and 'price_history'
-        adjusted = risk_manager_strict.adjust_position_size(
-            "AAPL", DEFAULT_POSITION_VALUE, stable_prices, current_positions
-        )
-
-        assert adjusted >= 0, f"Adjusted size should be non-negative, got {adjusted}"
+    # test_adjust_size_with_math_error and test_adjust_size_with_missing_position_keys
+    # removed: adjust_position_size was deleted as part of B3 (see
+    # docs/personal/RISK_MANAGER_SIZING_DESIGN.md). Math-error and
+    # missing-key handling for the surviving methods (calculate_position_risk,
+    # calculate_portfolio_risk, enforce_limits) is covered separately in
+    # the same file's TestCalculatePositionRisk and TestEdgeCases.
 
     def test_volatility_with_very_stable_prices(self, risk_manager):
         """Test volatility with very stable prices."""
@@ -697,38 +618,6 @@ class TestEdgeCases:
         )
 
         assert rm.max_portfolio_risk == 0.001, "Should accept minimum valid values"
-
-    def test_adjust_size_with_high_portfolio_risk(self, risk_manager_soft, sample_prices):
-        """
-        Test portfolio adjustment when portfolio risk is high.
-
-        When existing positions have high individual risk and moderate correlation,
-        adding a new position should result in reduced position sizing.
-        """
-        current_positions = {
-            "MSFT": {
-                "value": DEFAULT_POSITION_VALUE * 5,
-                "risk": HIGH_RISK_VALUE,
-                "price_history": sample_prices.copy(),
-            },
-            "GOOGL": {
-                "value": DEFAULT_POSITION_VALUE * 5,
-                "risk": HIGH_RISK_VALUE,
-                "price_history": sample_prices.copy(),
-            },
-        }
-        risk_manager_soft.position_correlations[("MSFT", "GOOGL")] = MODERATE_CORRELATION
-        risk_manager_soft.position_correlations[("GOOGL", "MSFT")] = MODERATE_CORRELATION
-
-        np.random.seed(RANDOM_SEED + 3)
-        new_prices = (200 + np.cumsum(np.random.randn(50) * 0.5)).tolist()
-        adjusted = risk_manager_soft.adjust_position_size(
-            "AAPL", DEFAULT_POSITION_VALUE, new_prices, current_positions
-        )
-
-        assert (
-            0 <= adjusted <= DEFAULT_POSITION_VALUE
-        ), f"Adjusted should be in [0, {DEFAULT_POSITION_VALUE}], got {adjusted}"
 
     def test_max_drawdown_with_zero_start(self, risk_manager):
         """Test max drawdown when starting with zero."""

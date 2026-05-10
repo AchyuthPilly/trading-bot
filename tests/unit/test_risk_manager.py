@@ -488,35 +488,14 @@ class TestCalculatePortfolioRisk:
         assert isinstance(risk, float)
         assert risk > 0, "Two correlated positions should produce non-zero risk"
 
-    def test_adjust_position_size_with_held_position_having_none_risk(
-        self, risk_manager_strict, stable_prices
-    ):
-        """End-to-end regression for the today's-baseline scenario:
-        sizing a new symbol while holding a position whose ``risk`` key is
-        explicitly None (as MomentumStrategy seeds it). Pre-fix the inner
-        ``calculate_portfolio_risk`` raised, the except path returned the
-        threshold, and the caller saw a no-op portfolio_adjustment — so
-        the surface symptom was a logged error, not a wrong number. This
-        test asserts the error is gone."""
-        import numpy as np
-
-        np.random.seed(7)
-        msft_prices = (380 + np.cumsum(np.random.randn(50) * 1.5)).tolist()
-        current_positions = {
-            "MSFT": {
-                "value": DEFAULT_POSITION_VALUE,
-                "price_history": msft_prices,
-                "risk": None,
-            },
-        }
-
-        adjusted = risk_manager_strict.adjust_position_size(
-            "AAPL", DEFAULT_POSITION_VALUE, stable_prices, current_positions
-        )
-
-        assert adjusted is not None
-        assert isinstance(adjusted, (int, float))
-        assert adjusted >= 0
+    # test_adjust_position_size_with_held_position_having_none_risk removed:
+    # the test was added by PR #18 to lock None-tolerance through
+    # adjust_position_size, but PR #19 deleted that method. The other two
+    # PR #18 None-tolerance tests
+    # (test_portfolio_risk_tolerates_explicit_none_risk and
+    # test_portfolio_risk_tolerates_none_risk_with_correlation, both above)
+    # cover calculate_portfolio_risk's None handling directly and remain
+    # valid post-#19.
 
 
 # =============================================================================

@@ -444,6 +444,80 @@ class TestCalculatePortfolioRisk:
 
         assert risk >= 0, f"Portfolio risk should be non-negative, got {risk}"
 
+    def test_portfolio_risk_tolerates_explicit_none_risk(self, risk_manager, caplog):
+        """Regression: positions whose 'risk' key is explicitly None must not
+        trigger ``unsupported operand type(s) for *: 'float' and 'NoneType'``.
+
+        MomentumStrategy._build_current_positions_dict seeds held positions
+        with ``"risk": None`` for the symbol-being-sized to fill in later.
+        Pre-fix, ``pos.get("risk", default)`` returned ``None`` (default only
+        applies when the key is *absent*), and the multiplication failed.
+        Post-fix, ``_position_risk`` coerces None → max_position_risk.
+
+        Single-position case: hits line 524's ``weight * pos["risk"]``.
+        """
+        positions = {
+            "MSFT": {"value": DEFAULT_POSITION_VALUE, "risk": None},
+        }
+
+        with caplog.at_level("ERROR", logger="strategies.risk_manager"):
+            risk = risk_manager.calculate_portfolio_risk(positions)
+
+        assert risk is not None
+        assert isinstance(risk, float)
+        assert risk == risk_manager.max_position_risk, (
+            f"Single-position portfolio with None risk should fall back to "
+            f"max_position_risk ({risk_manager.max_position_risk}), got {risk}"
+        )
+        assert not any(
+            "unsupported operand" in rec.getMessage() for rec in caplog.records
+        ), "TypeError leaked through the success path"
+
+    def test_portfolio_risk_tolerates_none_risk_with_correlation(self, risk_manager):
+        """Multi-position case: hits the correlation cross-term at lines
+        531-537, which multiplies pos1.risk * pos2.risk * corr — any None
+        in either pos pre-fix would explode mid-product."""
+        positions = {
+            "MSFT": {"value": DEFAULT_POSITION_VALUE, "risk": None},
+            "AAPL": {"value": DEFAULT_POSITION_VALUE, "risk": HIGH_RISK_VALUE},
+        }
+        risk_manager.position_correlations[("MSFT", "AAPL")] = HIGH_CORRELATION
+
+        risk = risk_manager.calculate_portfolio_risk(positions)
+
+        assert isinstance(risk, float)
+        assert risk > 0, "Two correlated positions should produce non-zero risk"
+
+    def test_adjust_position_size_with_held_position_having_none_risk(
+        self, risk_manager_strict, stable_prices
+    ):
+        """End-to-end regression for the today's-baseline scenario:
+        sizing a new symbol while holding a position whose ``risk`` key is
+        explicitly None (as MomentumStrategy seeds it). Pre-fix the inner
+        ``calculate_portfolio_risk`` raised, the except path returned the
+        threshold, and the caller saw a no-op portfolio_adjustment — so
+        the surface symptom was a logged error, not a wrong number. This
+        test asserts the error is gone."""
+        import numpy as np
+
+        np.random.seed(7)
+        msft_prices = (380 + np.cumsum(np.random.randn(50) * 1.5)).tolist()
+        current_positions = {
+            "MSFT": {
+                "value": DEFAULT_POSITION_VALUE,
+                "price_history": msft_prices,
+                "risk": None,
+            },
+        }
+
+        adjusted = risk_manager_strict.adjust_position_size(
+            "AAPL", DEFAULT_POSITION_VALUE, stable_prices, current_positions
+        )
+
+        assert adjusted is not None
+        assert isinstance(adjusted, (int, float))
+        assert adjusted >= 0
+
 
 # =============================================================================
 # Position Size Adjustment Tests
@@ -559,13 +633,18 @@ class TestEdgeCases:
         assert 0 <= corr <= 1.0, f"Correlation should be in [0, 1], got {corr}"
 
     def test_portfolio_risk_handles_missing_value_key(self, risk_manager):
-        """Test portfolio risk handles missing 'value' key gracefully."""
+        """Test portfolio risk handles missing 'value' key gracefully.
+
+        Fallback returns 0.0 (neutral — no portfolio risk computable) rather
+        than max_portfolio_risk. The old fallback only avoided shrinking
+        positions because the comparison in adjust_position_size is strict
+        (`>`, not `>=`); any change to that operator or threshold would have
+        silently turned the fallback into a real shrink-or-block.
+        """
         positions = {"AAPL": {"invalid_key": 10000}}
         risk = risk_manager.calculate_portfolio_risk(positions)
 
-        assert (
-            risk == risk_manager.max_portfolio_risk
-        ), f"Expected max portfolio risk on error, got {risk}"
+        assert risk == 0.0, f"Expected 0.0 (neutral fallback) on error, got {risk}"
 
     def test_adjust_size_with_math_error(self, risk_manager_strict):
         """Test adjust_position_size handles math errors gracefully."""

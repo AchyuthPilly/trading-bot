@@ -508,6 +508,20 @@ class RiskManager:
             logger.error(f"Data error calculating correlation between {symbol1} and {symbol2}: {e}")
             return 1.0  # Return maximum correlation on error
 
+    def _position_risk(self, pos: Dict) -> float:
+        """Return the position-risk score, coercing missing/None to the default.
+
+        `dict.get("risk", default)` returns the default only when the key is
+        absent. Callers (e.g., MomentumStrategy._build_current_positions_dict)
+        seed the dict with `"risk": None` for held positions whose risk hasn't
+        been computed yet — which would propagate `None` into the multiplications
+        in `calculate_portfolio_risk`. Coerce explicitly here.
+        """
+        risk = pos.get("risk")
+        if risk is None:
+            return self.max_position_risk
+        return risk
+
     def calculate_portfolio_risk(self, positions):
         """Calculate total portfolio risk."""
         try:
@@ -521,7 +535,7 @@ class RiskManager:
                 position_weights.append(weight)
 
                 # Add individual position risk
-                total_risk += weight * pos.get("risk", self.max_position_risk)
+                total_risk += weight * self._position_risk(pos)
 
             # Add correlation impact
             for i, (sym1, pos1) in enumerate(positions.items()):
@@ -531,16 +545,23 @@ class RiskManager:
                         total_risk += (
                             position_weights[i]
                             * position_weights[j]
-                            * pos1.get("risk", self.max_position_risk)
-                            * pos2.get("risk", self.max_position_risk)
+                            * self._position_risk(pos1)
+                            * self._position_risk(pos2)
                             * corr
                         )
 
             return total_risk
 
         except Exception as e:
+            # Neutral fallback: 0.0 means "no portfolio risk computable", which
+            # leaves `portfolio_adjustment` at 1.0 in the caller. Returning
+            # `self.max_portfolio_risk` here was a footgun — it equals the
+            # threshold and only avoids triggering the shrink because the
+            # comparison in `adjust_position_size` is strict (`>`, not `>=`).
+            # Any future change to that operator or threshold would silently
+            # turn this fallback into a real position shrink-or-block.
             logger.error(f"Error calculating portfolio risk: {e}")
-            return self.max_portfolio_risk
+            return 0.0
 
     def adjust_position_size(
         self,
